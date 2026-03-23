@@ -12,6 +12,101 @@ function ngrokHeaders() {
     ? { 'ngrok-skip-browser-warning': 'true' } : {}
 }
 
+function parseSseResponse(raw) {
+  const textParts = []
+  const lines = raw.split(/\r?\n/)
+  let i = 0
+  while (i < lines.length) {
+    const line = lines[i]
+    if (line.startsWith('data:')) {
+      let buf = line.slice(5).trim()
+      i++
+      while (i < lines.length && !lines[i].startsWith('data:') && lines[i].trim() !== '') {
+        buf += '\n' + lines[i]
+        i++
+      }
+      if (buf && buf !== '[DONE]') {
+        try {
+          const obj = JSON.parse(buf)
+          const d = obj.data || obj
+          if (d?.content?.parts) {
+            for (const p of d.content.parts) {
+              if (p.text) textParts.push(p.text)
+            }
+          }
+        } catch (_) {}
+      }
+    } else {
+      i++
+    }
+  }
+  let fullText = textParts.join('')
+
+  // 尝试解析 root_agent 的 generate_story_outlines_response 格式
+  const out = tryParseStoryOutlinesResponse(fullText)
+  if (out) {
+    return out
+  }
+  return { success: true, result: fullText }
+}
+
+/** 提取并格式化 generate_story_outlines_response 的 output */
+function tryParseStoryOutlinesResponse(text) {
+  let parsed = null
+  try {
+    parsed = JSON.parse(text)
+  } catch (_) {
+    const idx = text.indexOf('"generate_story_outlines_response"')
+    if (idx >= 0) {
+      const start = text.lastIndexOf('{', idx)
+      if (start >= 0) {
+        const extracted = extractBalancedJson(text, start)
+        if (extracted) parsed = JSON.parse(extracted)
+      }
+    }
+  }
+  if (!parsed || parsed.action !== 'generate_story_outlines_response') return null
+  const output = parsed.output
+  if (!output || typeof output !== 'object') return null
+
+  const lines = []
+  for (const key of ['story_outline_1', 'story_outline_2']) {
+    const o = output[key]
+    if (!o || typeof o !== 'object') continue
+    const title = o.title ? `【${o.title}】` : ''
+    const core = o.core_setting || ''
+    const synopsis = o.episode_synopsis || ''
+    const block = [title, core, synopsis].filter(Boolean).join('\n\n')
+    if (block) lines.push(block)
+  }
+  if (lines.length === 0) return null
+  return { success: true, result: lines.join('\n\n' + '─'.repeat(40) + '\n\n') }
+}
+
+function extractBalancedJson(str, start) {
+  if (str[start] !== '{') return null
+  let depth = 0
+  let inString = false
+  let esc = false
+  let quote = ''
+  for (let i = start; i < str.length; i++) {
+    const c = str[i]
+    if (esc) { esc = false; continue }
+    if (c === '\\' && inString) { esc = true; continue }
+    if (inString) {
+      if (c === quote) inString = false
+      continue
+    }
+    if (c === '"' || c === "'") { inString = true; quote = c; continue }
+    if (c === '{') depth++
+    else if (c === '}') {
+      depth--
+      if (depth === 0) return str.slice(start, i + 1)
+    }
+  }
+  return null
+}
+
 // 火山网关实测仅 /invoke 可达，其余 404；优先使用 /invoke
 const CLOUD_PATHS = [
   { path: '/invoke', adapt: (p) => ({ body: JSON.stringify(p) }) },
@@ -78,8 +173,18 @@ export function useApi() {
               const errData = await res.json().catch(() => ({}))
               throw new Error(errData.error || errData.message || '请求失败 ' + res.status)
             }
-            const data = await res.json()
-            // 适配不同返回格式：result / text / 火山 invoke 的 data.content.parts
+            const contentType = res.headers.get('content-type') || ''
+            const raw = await res.text()
+            let data
+            if (raw.trimStart().startsWith('data:')) {
+              data = parseSseResponse(raw)
+            } else {
+              try {
+                data = JSON.parse(raw)
+              } catch {
+                throw new Error('响应格式异常: ' + raw.slice(0, 100))
+              }
+            }
             if (data.result !== undefined) return data
             if (data.text !== undefined) return { ...data, result: data.text }
             const d = data.data || data
