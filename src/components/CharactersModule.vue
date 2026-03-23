@@ -15,7 +15,7 @@
 import { ref } from 'vue'
 import { useApi } from '../composables/useApi'
 import { useWorkspaceStore } from '../stores/workspace'
-
+// ok
 const { callApi } = useApi()
 const workspace = useWorkspaceStore()
 const input = ref('')

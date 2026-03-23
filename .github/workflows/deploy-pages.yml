@@ -29,7 +29,6 @@ jobs:
         run: |
           echo "VITE_AGENT_API_URL=${{ secrets.VITE_AGENT_API_URL }}" >> .env.production
           echo "VITE_AGENT_API_KEY=${{ secrets.VITE_AGENT_API_KEY }}" >> .env.production
-        continue-on-error: true
 
       - name: Install and build
         run: |
