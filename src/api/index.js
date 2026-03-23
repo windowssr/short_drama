@@ -15,6 +15,9 @@ const api = axios.create({
 
 // 请求拦截器：云端用 API Key + user_id/session_id（部分网关需要）
 api.interceptors.request.use((config) => {
+  if (typeof window !== 'undefined' && window.location?.hostname?.includes('ngrok')) {
+    config.headers['ngrok-skip-browser-warning'] = 'true'
+  }
   if (agentApiKey) {
     config.headers.Authorization = `Bearer ${agentApiKey}`
     config.headers['user_id'] = config.headers['user_id'] || 'web_user'

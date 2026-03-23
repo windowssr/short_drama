@@ -23,6 +23,7 @@
       <button class="btn-primary" @click="generate">生成故事梗概</button>
     </div>
     <div class="output-area">
+      <p v-if="fallbackHint" class="fallback-hint">⚠️ 未连接大模型，此为预设模板。请配置 MODEL_AGENT_API_KEY 或检查网络。</p>
       <textarea v-model="output" readonly placeholder="输出结果将显示在这里..."></textarea>
     </div>
   </section>
@@ -41,6 +42,7 @@ const femaleName = ref('')
 const input = ref('')
 const output = ref('')
 const selectedTags = ref([])
+const fallbackHint = ref(false)
 
 const allTags = [
   '男频', '女频', '大女主', '东方仙侠', '西方玄幻', '传统玄幻', '科幻', '末世', '武侠', '重生',
@@ -53,16 +55,22 @@ const allTags = [
 ]
 
 async function generate() {
+  fallbackHint.value = false
   const combinedInput = `短剧名字: ${dramaName.value}\n男主名字: ${maleName.value}\n女主名字: ${femaleName.value}\n标签: ${selectedTags.value.join(', ')}\n内容: ${input.value}`
-  const data = await callApi({
-    action: 'generate_story_outlines',
-    input: combinedInput
-  })
-  if (data?.success) {
-    output.value = data.result
-    workspace.storyOutput = data.result
-  } else {
-    output.value = `错误: ${data?.error || '未知错误'}`
+  try {
+    const data = await callApi({
+      action: 'generate_story_outlines',
+      input: combinedInput
+    })
+    if (data?.success) {
+      output.value = data.result
+      workspace.storyOutput = data.result
+      fallbackHint.value = !!data.from_fallback
+    } else {
+      output.value = `错误: ${data?.error || '未知错误'}`
+    }
+  } catch (err) {
+    output.value = `请求失败: ${err.message || '网络错误，请检查后端是否启动 (python -m handler)'}`
   }
 }
 </script>
@@ -166,6 +174,15 @@ async function generate() {
 
 .btn-primary:hover {
   background: var(--color-primary-hover);
+}
+
+.fallback-hint {
+  color: #b45309;
+  font-size: 0.9rem;
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  background: #fef3c7;
+  border-radius: 8px;
 }
 
 .output-area textarea {

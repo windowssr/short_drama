@@ -7,13 +7,18 @@ const agentApiKey = import.meta.env.VITE_AGENT_API_KEY || ''
 const useCloudProxy = import.meta.env.VITE_AGENT_USE_PROXY === '1'
 const useCloud = !!agentBaseURL || useCloudProxy
 
-// 云端多路径 fallback：火山网关可能只转发部分路径
+function ngrokHeaders() {
+  return (typeof window !== 'undefined' && window.location?.hostname?.includes('ngrok'))
+    ? { 'ngrok-skip-browser-warning': 'true' } : {}
+}
+
+// 火山网关实测仅 /invoke 可达，其余 404；优先使用 /invoke
 const CLOUD_PATHS = [
+  { path: '/invoke', adapt: (p) => ({ body: JSON.stringify(p) }) },
   { path: '/chat', adapt: (p) => p },
   { path: '/', adapt: (p) => p },
   { path: '/api', adapt: (p) => p },
-  { path: '/v1/invoke', adapt: (p) => ({ body: JSON.stringify(p) }) },
-  { path: '/invoke', adapt: (p) => ({ body: JSON.stringify(p) }) }
+  { path: '/v1/invoke', adapt: (p) => ({ body: JSON.stringify(p) }) }
 ]
 
 export function useApi() {
@@ -30,7 +35,7 @@ export function useApi() {
           try {
             const res = await fetch('/api/cloud', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 'Content-Type': 'application/json', ...ngrokHeaders() },
               body: JSON.stringify(payload),
               signal: ctrl.signal
             })
@@ -74,9 +79,14 @@ export function useApi() {
               throw new Error(errData.error || errData.message || '请求失败 ' + res.status)
             }
             const data = await res.json()
-            // 适配不同返回格式：result / text / data
+            // 适配不同返回格式：result / text / 火山 invoke 的 data.content.parts
             if (data.result !== undefined) return data
             if (data.text !== undefined) return { ...data, result: data.text }
+            const d = data.data || data
+            if (d?.content?.parts) {
+              const text = (d.content.parts || []).map(p => p.text || '').filter(Boolean).join('')
+              return { success: true, result: text }
+            }
             return data
           } catch (e) {
             if (e.name === 'AbortError') throw new Error('请求超时（10 分钟），分集大纲生成耗时较长，请稍后重试')
@@ -105,6 +115,7 @@ export function useApi() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...ngrokHeaders(),
           ...(token && { Authorization: `Bearer ${token}` })
         },
         body: JSON.stringify({
