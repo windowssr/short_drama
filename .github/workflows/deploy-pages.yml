@@ -33,6 +33,9 @@ jobs:
           npm ci
           npm run build -- --base=/${{ github.event.repository.name }}/ --outDir=dist
 
+      - name: Fix SPA 404 (GitHub Pages)
+        run: cp dist/index.html dist/404.html
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
 

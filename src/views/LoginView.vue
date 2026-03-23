@@ -33,6 +33,10 @@
         <button type="submit" class="login-btn" :disabled="loading">
           {{ loading ? '登录中...' : '登 录' }}
         </button>
+        <p v-if="showDemoHint" class="demo-hint">
+          GitHub Pages 静态部署无后端，可
+          <a href="#" @click.prevent="enterDemo">演示进入</a>
+        </p>
       </form>
       <!-- 注册表单 -->
       <form v-else @submit.prevent="handleRegister" class="login-form">
@@ -73,9 +77,12 @@
         <button type="submit" class="login-btn" :disabled="loading">
           {{ loading ? '注册中...' : '注 册' }}
         </button>
+        <p v-if="showDemoHint" class="demo-hint">
+          <a href="#" @click.prevent="enterDemo">演示进入</a>
+        </p>
       </form>
       <p class="toggle-form">
-        <a href="#" @click.prevent="isRegister = !isRegister; errorMessage = ''">
+        <a href="#" @click.prevent="showDemoHint = false; isRegister = !isRegister; errorMessage = ''">
           {{ isRegister ? '已有账号？去登录' : '没有账号？去注册' }}
         </a>
       </p>
@@ -100,9 +107,16 @@ const confirmPassword = ref('')
 const errorMessage = ref('')
 const loading = ref(false)
 const isRegister = ref(false)
+const showDemoHint = ref(false)
+
+function enterDemo() {
+  authStore.setAuth('demo-token', username.value || 'demo')
+  router.push(route.query.redirect || '/')
+}
 
 async function handleLogin() {
   errorMessage.value = ''
+  showDemoHint.value = false
   loading.value = true
   try {
     const { data } = await api.post('/api/login', {
@@ -117,7 +131,9 @@ async function handleLogin() {
       errorMessage.value = data.message || '登录失败'
     }
   } catch (err) {
+    const status = err.response?.status
     errorMessage.value = err.response?.data?.message || '网络错误，请稍后重试'
+    if (status === 405 || status === 404) showDemoHint.value = true
   } finally {
     loading.value = false
   }
@@ -147,6 +163,7 @@ async function handleRegister() {
     }
   } catch (err) {
     errorMessage.value = err.response?.data?.message || '网络错误，请稍后重试'
+    if (err.response?.status === 405 || err.response?.status === 404) showDemoHint.value = true
   } finally {
     loading.value = false
   }
@@ -280,6 +297,19 @@ async function handleRegister() {
 }
 
 .toggle-form a:hover {
+  text-decoration: underline;
+}
+
+.demo-hint {
+  margin-top: 12px;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+.demo-hint a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+.demo-hint a:hover {
   text-decoration: underline;
 }
 </style>
