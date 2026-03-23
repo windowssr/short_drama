@@ -1,0 +1,47 @@
+:root {
+  --color-bg: #f8f9fa;
+  --color-surface: #ffffff;
+  --color-surface-elevated: #ffffff;
+  --color-border: #e2e4e8;
+  --color-primary: #5b4fc7;
+  --color-primary-hover: #4a3fb5;
+  --color-accent: #00a884;
+  --color-text: #1a1a1a;
+  --color-text-muted: #6b7280;
+  --color-error: #dc3545;
+  --font-sans: 'Noto Sans SC', system-ui, sans-serif;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--color-bg);
+  color: var(--color-text);
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+input, textarea, button {
+  font-family: inherit;
+}
+
+/* 滚动条 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: #c5c7cc;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
