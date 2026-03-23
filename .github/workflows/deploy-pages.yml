@@ -25,12 +25,10 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Create env for build
-        run: |
-          echo "VITE_AGENT_API_URL=${{ secrets.VITE_AGENT_API_URL }}" >> .env.production
-          echo "VITE_AGENT_API_KEY=${{ secrets.VITE_AGENT_API_KEY }}" >> .env.production
-
       - name: Install and build
+        env:
+          VITE_AGENT_API_URL: ${{ secrets.VITE_AGENT_API_URL }}
+          VITE_AGENT_API_KEY: ${{ secrets.VITE_AGENT_API_KEY }}
         run: |
           npm ci
           npm run build -- --base=/${{ github.event.repository.name }}/ --outDir=dist
